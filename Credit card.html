@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מחשבון כדאיות כרטיסי אשראי לטיסות</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#ffffff;--bg2:#f5f4ef;--text:#2c2c2a;--text2:#5f5e5a;--text3:#9a9990;
+    --border:rgba(0,0,0,0.12);--info-bg:#e6f1fb;--info-text:#0c447c;
+    --pos:#3b6d11;--neg:#a32d2d;--warn:#854f0b;--radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg2);color:var(--text);font-family:-apple-system,"Segoe UI",Arial,sans-serif;line-height:1.6;}
+  main{max-width:760px;margin:0 auto;padding:24px 18px 48px;}
+  h1{font-size:22px;font-weight:600;margin:0 0 4px;}
+  .lead{color:var(--text2);font-size:14px;margin:0 0 20px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px;}
+  .card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+  .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  label{font-size:13px;color:var(--text2);}
+  .val{font-size:16px;font-weight:600;}
+  input[type=range]{width:100%;accent-color:#185fa5;}
+  .note{font-size:13px;color:var(--text2);background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin:0 0 12px;}
+  .winner{font-size:14px;font-weight:600;color:var(--info-text);background:var(--info-bg);border-radius:var(--radius);padding:10px 14px;margin:0 0 12px;}
+  .chartwrap{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;margin:0 0 16px;height:320px;position:relative;}
+  table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  th,td{padding:9px 8px;border-bottom:0.5px solid var(--border);text-align:right;}
+  th{color:var(--text2);font-weight:600;font-size:12px;background:var(--bg2);}
+  .sub{font-size:11px;color:var(--text3);}
+  .muted{color:var(--text2);}.pos{color:var(--pos);font-weight:600;}.neg{color:var(--neg);font-weight:600;}
+  tr.win{background:var(--info-bg);}
+  .warn{color:var(--warn);font-weight:700;}
+  .foot{font-size:12px;color:var(--text3);margin-top:14px;line-height:1.6;}
+  .elig{font-size:12px;color:var(--warn);margin-top:10px;line-height:1.6;}
+</style>
+</head>
+<body>
+<main>
+  <h1>מחשבון כדאיות כרטיסי אשראי לטיסות</h1>
+  <p class="lead">הזינו הוצאה חודשית, אחוז הוצאות ממשלתיות, אחוז עסקאות מט"ח ותדירות מימוש. הטבלה והגרף מתעדכנים מיד וממוינים לפי ערך נטו לשנה.</p>
+
+  <div class="grid">
+    <div class="card"><div class="row"><label for="spend">הוצאה חודשית</label><span class="val" id="spend-out">₪10,000</span></div><input type="range" id="spend" min="1000" max="60000" step="500" value="10000"></div>
+    <div class="card"><div class="row"><label for="gov">% הוצאות ממשלתיות</label><span class="val" id="gov-out">10%</span></div><input type="range" id="gov" min="0" max="40" step="1" value="10"></div>
+    <div class="card"><div class="row"><label for="fx">% עסקאות מט"ח</label><span class="val" id="fx-out">5%</span></div><input type="range" id="fx" min="0" max="50" step="1" value="5"></div>
+    <div class="card"><div class="row"><label for="freq">תדירות מימוש</label><span class="val" id="freq-out">12 חודשים</span></div><input type="range" id="freq" min="1" max="60" step="1" value="12"></div>
+  </div>
+
+  <p class="note" id="surv-note"></p>
+  <div class="winner" id="winner"></div>
+  <div class="chartwrap"><canvas id="chart"></canvas></div>
+
+  <table>
+    <thead><tr>
+      <th style="width:6%;">#</th><th style="width:36%;">כרטיס</th><th style="width:15%;">ברוטו/שנה</th><th style="width:11%;">שורד</th><th style="width:14%;">דמי כרטיס</th><th style="width:18%;">נטו/שנה</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+  <p class="elig" id="elig-note"></p>
+  <p class="foot">ההשוואה מניחה כרטיסים שאינם משולבי דינרס, כלומר מאסטרקארד או אמריקן אקספרס בלבד, כך שקבלת הכרטיס בארץ מלאה. נקודת אל על מוערכת בערך קבוע של 0.0235 ₪ (155 נקודות = 1$, מסלול Cash & Points). הנטו כולל קיזוז של הפרש עמלת המט"ח בלבד מול הכרטיס הזול ביותר (1.8%), המוצג בשורת המשנה. ערכים במצב קבוע (שנה ב'); בשנה א' FlyAll ו-SkyMax פטורים מדמי כרטיס, כלומר הנטו גבוה יותר. שיעורי המט"ח: FlyAll Premium ו-FlyCard Premium 1.8%, FlyCard Premium Select 2.2%, FlyAll בסיס ו-FlyCard בסיס 2.5%, SkyMax 3%. נוסחת הפקיעה: תוקף הנקודות חלקי מחזור המימוש. אומדנים נכון ליוני 2026, לאימות מול התקנונים ומול מחירי הפלטפורמות.</p>
+</main>
+
+<script>
+(function(){
+  var ELAL=0.0235;
+  var cards=[
+    {n:"FlyAll Premium", s:"כאל, מאסטרקארד", r:0.01, g:0.005, pv:1, fee:346.8, val:24, fx:1.8, color:"#534AB7"},
+    {n:"FlyAll בסיס", s:"כאל, מאסטרקארד", r:0.0075, g:0.00375, pv:1, fee:238.8, val:24, fx:2.5, color:"#7F77DD"},
+    {n:"SkyMax Premium", s:"מקס, Max Travel", r:1/130, g:1/320, pv:1, fee:238.8, val:36, fx:3.0, minTot:8000, color:"#0F6E56"},
+    {n:"SkyMax בסיס", s:"מקס, Max Travel", r:1/160, g:1/320, pv:1, fee:238.8, val:36, fx:3.0, color:"#1D9E75"},
+    {n:"FlyCard Premium", s:"אל על, ישראכרט", r:0.25, g:0.125, pv:"elal", fee:466.8, val:18, fx:1.8, minReg:10000, color:"#712B13"},
+    {n:"FlyCard Prem. Select", s:"אל על, ישראכרט", r:1/4.5, g:1/9, pv:"elal", fee:334.8, val:18, fx:2.2, minReg:10000, color:"#993C1D"},
+    {n:"FlyCard בסיס", s:"אל על, ישראכרט", r:0.2, g:0.1, pv:"elal", fee:238.8, val:18, fx:2.5, color:"#D85A30"}
+  ];
+  var chart=null;
+  function el(id){return document.getElementById(id);}
+  function fmt(n){return "₪"+Math.round(n).toLocaleString("he-IL");}
+  function inputs(){return {monthly:+el("spend").value, gov:+el("gov").value/100, fx:+el("fx").value/100, cycle:+el("freq").value, elal:ELAL};}
+  function calc(p){
+    var annReg=p.monthly*(1-p.gov)*12, annGov=p.monthly*p.gov*12;
+    var fxSpend=Math.min(p.monthly*p.fx, p.monthly*(1-p.gov))*12;
+    var minFx=Math.min.apply(null, cards.map(function(c){return c.fx;}));
+    return cards.map(function(c){
+      var pv=c.pv==="elal"?p.elal:1;
+      var gross=(annReg*c.r+annGov*c.g)*pv;
+      var fxDiff=fxSpend*((c.fx-minFx)/100);
+      var monthlyReg=p.monthly*(1-p.gov);
+      var inel=(c.minReg&&monthlyReg<c.minReg)||(c.minTot&&p.monthly<c.minTot);
+      return {c:c, gross:gross, fxDiff:fxDiff, inel:inel, netAt:function(f){return gross*Math.min(1,c.val/f)-c.fee-fxDiff;}};
+    });
+  }
+  function render(){
+    var p=inputs();
+    el("spend-out").textContent=fmt(p.monthly);
+    el("gov-out").textContent=Math.round(p.gov*100)+"%";
+    el("fx-out").textContent=Math.round(p.fx*100)+"%";
+    el("freq-out").textContent=p.cycle+" חודשים ("+(p.cycle/12).toFixed(1)+" שנים)";
+    var rs=calc(p);
+    var rows=rs.map(function(r){return {r:r, net:r.netAt(p.cycle)};});
+    rows.sort(function(a,b){return b.net-a.net;});
+    var tb=el("rows"); tb.innerHTML="";
+    rows.forEach(function(o,i){
+      var r=o.r, c=r.c, tr=document.createElement("tr");
+      if(i===0&&o.net>0)tr.className="win";
+      var sub=c.s+' · מט"ח '+c.fx+'%'+(r.fxDiff>0.5?' · קיזוז '+fmt(r.fxDiff):'');
+      var warn=r.inel?' <span class="warn">⚠</span>':'';
+      tr.innerHTML='<td class="muted">'+(i+1)+'</td>'+
+        '<td><div>'+c.n+warn+'</div><div class="sub">'+sub+'</div></td>'+
+        '<td>'+fmt(r.gross)+'</td>'+
+        '<td>'+Math.round(Math.min(1,c.val/p.cycle)*100)+'%</td>'+
+        '<td class="muted">'+(c.fee?fmt(c.fee):"0")+'</td>'+
+        '<td class="'+(o.net>=0?"pos":"neg")+'">'+fmt(o.net)+'</td>';
+      tb.appendChild(tr);
+    });
+    el("winner").textContent=rows[0].net>0?("המשתלם ביותר: "+rows[0].r.c.n+", "+fmt(rows[0].net)+" נטו לשנה"):"בתרחיש הזה אף כרטיס לא מייצר ערך נטו חיובי";
+    var sk=Math.round(Math.min(1,36/p.cycle)*100), fa=Math.round(Math.min(1,24/p.cycle)*100), fc=Math.round(Math.min(1,18/p.cycle)*100);
+    el("surv-note").textContent="במחזור מימוש של "+p.cycle+" חודשים שורדות הנקודות: SkyMax (תוקף 36 ח') "+sk+"%, FlyAll (24 ח') "+fa+"%, FlyCard (18 ח') "+fc+"%. ככל שמממשים נדיר יותר, התוקף חשוב יותר מקצב הצבירה.";
+    var inel=rows.filter(function(o){return o.r.inel;}).map(function(o){return o.r.c.n;});
+    el("elig-note").textContent=inel.length?("לא עומד בתנאי הסף ברמת ההוצאה הנוכחית: "+inel.join(", ")+". SkyMax Premium דורש ₪8,000 בחודש, FlyCard Premium ו-Select דורשים ₪10,000 רגיל בחודש."):"";
+    drawChart(p, rs);
+  }
+  function drawChart(p, rs){
+    if(typeof Chart==="undefined"){return;}
+    var xs=[]; for(var f=1;f<=60;f++)xs.push(f);
+    var ds=rs.map(function(r){return {label:r.c.n, borderColor:r.c.color, backgroundColor:r.c.color, data:xs.map(function(f){return {x:f,y:Math.round(r.netAt(f))};}), borderWidth:2, pointRadius:0, tension:0.15};});
+    if(chart){chart.data.datasets=ds; chart.options.plugins.cyc.cycle=p.cycle; chart.update(); return;}
+    var txt=(getComputedStyle(document.body).getPropertyValue("--text2")||"#5f5e5a").trim();
+    Chart.defaults.color=txt; Chart.defaults.font.family="-apple-system, Segoe UI, Arial, sans-serif";
+    chart=new Chart(el("chart").getContext("2d"),{type:"line",data:{datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,interaction:{mode:"nearest",intersect:false},
+        scales:{x:{type:"linear",min:1,max:60,title:{display:true,text:"מחזור מימוש (חודשים)"},ticks:{stepSize:12},grid:{color:"rgba(0,0,0,0.06)"}},
+          y:{title:{display:true,text:"ערך נטו לשנה (₪)"},ticks:{callback:function(v){return "₪"+v;}},grid:{color:"rgba(0,0,0,0.06)"}}},
+        plugins:{legend:{position:"bottom",labels:{boxWidth:12,font:{size:11}}},cyc:{cycle:p.cycle},
+          tooltip:{callbacks:{title:function(it){return it[0].parsed.x+" חודשים";},label:function(it){return it.dataset.label+": ₪"+Math.round(it.parsed.y);}}}}},
+      plugins:[{id:"cyc",afterDraw:function(ch,a,o){var x=ch.scales.x.getPixelForValue(o.cycle);var c=ch.ctx;c.save();c.strokeStyle="rgba(0,0,0,0.35)";c.setLineDash([4,4]);c.beginPath();c.moveTo(x,ch.chartArea.top);c.lineTo(x,ch.chartArea.bottom);c.stroke();c.restore();}}]});
+  }
+  ["spend","gov","fx","freq"].forEach(function(id){el(id).addEventListener("input",render);});
+  render();
+})();
+</script>
+</body>
+</html>
